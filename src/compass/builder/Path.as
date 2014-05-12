@@ -36,7 +36,7 @@ public class Path {
 
     public function fetchBuilderNode():PathBuilderNode {
         if(! _cachedBuilderNodesIt.hasNext())
-            ensureCacheSize(Math.ceil(_cachedBuilderNodes.size() * 0.5) + 10);
+            ensureCacheSize(Math.ceil(_cachedBuilderNodes.size() * 1.5) + 10);
 
         return _cachedBuilderNodesIt.next();
     }

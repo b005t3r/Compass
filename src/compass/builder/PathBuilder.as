@@ -9,21 +9,20 @@ import compass.navigation.INavigationAgent;
 import compass.navigation.INavigationMap;
 import compass.navigation.INavigationNode;
 import compass.navigation.IStartNavigationNode;
-import compass.builder.Path;
 
 import medkit.collection.ArrayList;
-
 import medkit.collection.Collection;
 import medkit.collection.HashSet;
 import medkit.collection.TreeSet;
 import medkit.collection.iterator.Iterator;
 
 public class PathBuilder {
-    private var _alpha:Number;
+    private var _alpha:Number = 0.5;
 
     /**
      * How much actual and estimated cost is taken into account when pathfinding.
      * <code>cost = alpha * actualCostFromStart + (1 - alpha) * estimatedCostToEnd</code>
+     * For A* algorithm this should be set to 0.5. @default 0.5
      */
     public function get alpha():Number { return _alpha; }
     public function set alpha(value:Number):void { _alpha = value; }
@@ -35,6 +34,8 @@ public class PathBuilder {
         path.navigationNodes.add(startNode);
 
         continueSearch(finishNode, path, agent, maxIterations);
+
+        return path;
     }
 
     public function continueSearch(finishNode:IFinishNavigationNode, path:Path, agent:INavigationAgent, maxIterations:int = int.MAX_VALUE):Boolean {
@@ -63,12 +64,12 @@ public class PathBuilder {
         // let's assume we can find the path on one go
         path.complete = true;
 
-        openNodes.add(startNode);
-
         var currentNode:PathBuilderNode = path.fetchBuilderNode();
         currentNode.reset(startNode);
 
-        while(map.isConnectedToFinishNode(currentNode.navigationNode, finishNode, agent)) {
+        openNodes.add(currentNode);
+
+        while(! map.isConnectedToFinishNode(currentNode.navigationNode, finishNode, agent)) {
             if(openNodes.size() == 0 || maxIterations == 0) {
                 path.complete = false; // path still incomplete
                 break;
@@ -78,7 +79,8 @@ public class PathBuilder {
 
             connectedNodes = currentNode.navigationNode.connectedNodes;
 
-            for(var it:Iterator = connectedNodes.iterator(); it.hasNext(); ) {
+            var it:Iterator = connectedNodes.iterator();
+            while(it.hasNext()) {
                 var testNode:PathBuilderNode = path.fetchBuilderNode();
                 testNode.reset(it.next());
 
@@ -94,6 +96,7 @@ public class PathBuilder {
 
                 testNode.costFromStart          = actualCostFromStart;
                 testNode.estimatedTotalCost     = estimatedTotalCost;
+                testNode.parentNode             = currentNode;
 
                 if(openNodes.contains(testNode))
                     continue;
@@ -121,6 +124,9 @@ public class PathBuilder {
         }
 
         path.navigationNodes.addAll(pathContinuation);
+
+        if(path.complete)
+            path.navigationNodes.add(finishNode);
 
         // if there still is a chance and need to complete this path, return true; false otherwise
         return ! path.complete && openNodes.size() > 0;

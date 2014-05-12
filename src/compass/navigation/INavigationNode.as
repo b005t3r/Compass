@@ -8,7 +8,7 @@ import medkit.collection.Collection;
 
 public interface INavigationNode {
     /** Every node associated with a given map has to have an unique ID. */
-    function get uniqueID:int
+    function get uniqueID():int
 
     /** Navigation map this node belongs to. */
     function get navigationMap():INavigationMap
