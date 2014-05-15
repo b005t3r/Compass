@@ -27,7 +27,7 @@ public class PathBuilder {
     public function get alpha():Number { return _alpha; }
     public function set alpha(value:Number):void { _alpha = value; }
 
-    public function findPath(startNode:IStartNavigationNode, finishNode:IFinishNavigationNode, agent:INavigationAgent, maxIterations:int = int.MAX_VALUE, path:Path = null):Path {
+    public function findPath(startNode:IStartNavigationNode, finishNode:IFinishNavigationNode, agent:INavigationAgent, path:Path = null, maxIterations:int = int.MAX_VALUE):Path {
         if(path != null)    path.reset();
         else                path = new Path();
 
@@ -64,8 +64,7 @@ public class PathBuilder {
         // let's assume we can find the path on one go
         path.complete = true;
 
-        var currentNode:PathBuilderNode = path.fetchBuilderNode();
-        currentNode.reset(startNode);
+        var currentNode:PathBuilderNode = path.fetchBuilderNode().reset(startNode);
 
         openNodes.add(currentNode);
 
@@ -81,8 +80,7 @@ public class PathBuilder {
 
             var it:Iterator = connectedNodes.iterator();
             while(it.hasNext()) {
-                var testNode:PathBuilderNode = path.fetchBuilderNode();
-                testNode.reset(it.next());
+                var testNode:PathBuilderNode = path.fetchBuilderNode().reset(it.next());
 
                 var travelCost:Number = testNode.navigationNode.getTravelCost(currentNode.navigationNode, agent);
 
