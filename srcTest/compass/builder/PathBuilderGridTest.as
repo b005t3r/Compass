@@ -11,6 +11,7 @@ import compass.navigation.grid.GridNavigationNode;
 import compass.navigation.grid.GridStartNavigationNode;
 
 import medkit.collection.iterator.Iterator;
+import medkit.util.StopWatch;
 
 import org.flexunit.asserts.assertEquals;
 
@@ -83,7 +84,10 @@ public class PathBuilderGridTest {
         finish  = new GridFinishNavigationNode(map.getNodeAt(46, 38), map);
 
         var pathBuilder:PathBuilder = new PathBuilder();
+
+        StopWatch.startWatch("findPath");
         var path:Path = pathBuilder.findPath(start, finish, agent);
+        trace("path found in: ", StopWatch.stopWatch("findPath"));
 
         assertTrue(path.complete);
         assertEquals(start.uniqueID, GridNavigationNode(path.navigationNodes.get(0)).uniqueID);
@@ -106,13 +110,31 @@ public class PathBuilderGridTest {
 
             node = next;
         }
+
+        start   = new GridStartNavigationNode(map.getNodeAt(17, 35), map);
+        finish  = new GridFinishNavigationNode(map.getNodeAt(25, 34), map);
+
+        StopWatch.startWatch("findPath");
+        pathBuilder.findPath(start, finish, agent, path);
+        trace("path found in: ", StopWatch.stopWatch("findPath"));
+
+        assertTrue(! path.complete);
+
+        start   = new GridStartNavigationNode(map.getNodeAt(26, 14), map);
+        finish  = new GridFinishNavigationNode(map.getNodeAt(46, 9), map);
+
+        StopWatch.startWatch("findPath");
+        pathBuilder.findPath(start, finish, agent, path);
+        trace("path found in: ", StopWatch.stopWatch("findPath"));
+
+        assertTrue(path.complete);
+        assertEquals(start.uniqueID, GridNavigationNode(path.navigationNodes.get(0)).uniqueID);
+        assertEquals(finish.uniqueID, GridNavigationNode(path.navigationNodes.get(path.navigationNodes.size() - 1)).uniqueID);
     }
 
     [Test]
     public function testContinueSearch():void {
 
     }
-
 }
 }
-
