@@ -18,10 +18,6 @@ import medkit.geom.shapes.Point2D;
 import medkit.geom.shapes.Polygon2D;
 
 public class MeshNavigationMap implements INavigationMap {
-    public static function manhattanTravelCost(startNode:MeshNavigationNode, destinationNode:MeshNavigationNode, agent:MeshNavigationAgent, commonCost:Number = 1.0):Number {
-        return Math.abs(startNode.location.x - destinationNode.location.x) * commonCost + Math.abs(startNode.location.y + destinationNode.location.y) * commonCost;
-    }
-
     public static function euclidianTravelCost(startNode:MeshNavigationNode, destinationNode:MeshNavigationNode, agent:MeshNavigationAgent, commonCost:Number = 1.0):Number {
         return startNode.location.distance(destinationNode.location) * commonCost;
     }

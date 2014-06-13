@@ -7,7 +7,11 @@ package compass.navigation.mesh {
 import medkit.collection.ArrayList;
 import medkit.collection.Collection;
 import medkit.collection.CollectionUtil;
+import medkit.collection.HashMap;
+import medkit.collection.HashSet;
 import medkit.collection.List;
+import medkit.collection.Map;
+import medkit.collection.Set;
 import medkit.collection.iterator.Iterator;
 import medkit.geom.GeomUtil;
 import medkit.geom.shapes.Line2D;
@@ -21,14 +25,88 @@ import medkit.object.ObjectUtil;
 
 public class ShapeNavigationMapBuilder implements IMeshNavigatoinMapBuilder {
     private var _epsilon:Number;
+    private var _locations:Map;
 
     public function ShapeNavigationMapBuilder(shapes:Collection, epsilon:Number) {
-        var polys:List  = new ArrayList(shapes.size());
-        var points:List = new ArrayList(shapes.size() * 4);
+        _epsilon = epsilon;
 
-        populatePolysAndPoints(shapes, polys, points);
-        //var minDistance:Number = calculateMinimumDistance(points);
+        var polys:List = createPolygons(shapes);
+        snapPolygons(polys, epsilon);
 
+        _locations = mapPointsToPolygons(polys);
+    }
+
+    public function get epsilon():Number { return _epsilon; }
+
+    public function get locations():Collection { return _locations.keySet(); }
+
+    public function populateConnected(location:Point2D, map:MeshNavigationMap, resultNodes:Collection, resultPolygons:Collection):void {
+        var polys:List = _locations.get(location);
+
+        if(polys == null)
+            throw new ArgumentError("invalid location provided - no polygons registered for this location: " + location);
+
+        resultPolygons.addAll(polys);
+
+        var connectedPoints:Set = new HashSet();
+
+        var count:int = polys.size();
+        for(var i:int = 0; i < count; ++i) {
+            var poly:Polygon2D = polys.get(i);
+
+            var pointCount:int = poly.pointCount;
+            for(var j:int = 0; j < pointCount; ++j) {
+                var p:Point2D = poly.getPoint2D(j);
+
+                if(p.equals(location))
+                    continue;
+
+                connectedPoints.add(p);
+            }
+        }
+
+        var it:Iterator = connectedPoints.iterator();
+        while(it.hasNext()) {
+            var connectedLocation:Point2D = it.next();
+            var connectedNode:MeshNavigationNode = map.getNodeAt(connectedLocation.x, connectedLocation.y);
+
+            if(connectedNode == null)
+                throw new Error("node for given location does not exist: " + connectedLocation);
+
+            resultNodes.add(connectedNode);
+        }
+    }
+
+    private function createPolygons(shapes:Collection):List {
+        var polys:List = new ArrayList(shapes.size());
+
+        var it:Iterator = shapes.iterator();
+        while(it.hasNext()) {
+            var shape2D:Shape2D = it.next();
+            var poly:Polygon2D = new Polygon2D();
+
+            var coords:Vector.<Point2D> = new <Point2D>[new Point2D(), new Point2D(), new Point2D()];
+
+            for(var pathIt:PathIterator = shape2D.getPathIterator(null, 1); !pathIt.isDone(); pathIt.next()) {
+                var segType:SegmentType = pathIt.currentSegment(coords);
+
+                if(segType == SegmentType.QuadTo || segType == SegmentType.CubicTo)
+                    throw new ArgumentError("quad and cubic segments not supported");
+
+                if(segType == SegmentType.LineTo || segType == SegmentType.MoveTo)
+                    poly.addPoint2D(coords[0]);
+            }
+
+            if(poly.pointCount < 3)
+                throw new ArgumentError("line or point shapes are not allowed");
+
+            polys.add(poly);
+        }
+
+        return polys;
+    }
+
+    private function snapPolygons(polys:List, epsilon:Number):void {
         var edge:Line2D = new Line2D(), tempPoly:Polygon2D = new Polygon2D(), tempPoints:List = new ArrayList();
 
         var polyCount:int = polys.size();
@@ -38,26 +116,26 @@ public class ShapeNavigationMapBuilder implements IMeshNavigatoinMapBuilder {
 
             var coords:Vector.<Point2D> = new <Point2D>[new Point2D(), new Point2D(), new Point2D()];
 
-            for(var pathIt:PathIterator = poly.getPathIterator(); ! pathIt.isDone(); pathIt.next()) {
+            for(var pathIt:PathIterator = poly.getPathIterator(); !pathIt.isDone(); pathIt.next()) {
                 var segType:SegmentType = pathIt.currentSegment(coords);
 
                 if(segType == SegmentType.MoveTo) {
-                    edge.x2 = coords[0].x;
-                    edge.y2 = coords[0].y;
+                    edge.x2 = Math.round(coords[0].x / epsilon) * epsilon;
+                    edge.y2 = Math.round(coords[0].y / epsilon) * epsilon;
 
                     continue; // edge not initialized yet
                 }
                 else if(segType == SegmentType.LineTo) {
                     edge.x1 = edge.x2;
                     edge.y1 = edge.y2;
-                    edge.x2 = coords[0].x;
-                    edge.y2 = coords[0].y;
+                    edge.x2 = Math.round(coords[0].x / epsilon) * epsilon;
+                    edge.y2 = Math.round(coords[0].y / epsilon) * epsilon;
                 }
                 else if(segType == SegmentType.Close) {
                     edge.x1 = edge.x2;
                     edge.y1 = edge.y2;
-                    edge.x2 = poly.getPoint2D(0).x;
-                    edge.y2 = poly.getPoint2D(0).y;
+                    edge.x2 = Math.round(poly.getPoint2D(0).x / epsilon) * epsilon;
+                    edge.y2 = Math.round(poly.getPoint2D(0).y / epsilon) * epsilon;
                 }
                 else {
                     throw new Error("only MoveTo, LineTo and Close SegmentTypes are supported");
@@ -105,6 +183,10 @@ public class ShapeNavigationMapBuilder implements IMeshNavigatoinMapBuilder {
                             tempPoints.add(point);
                         }
 
+                        // round point's coords to epsilon
+                        point.x = Math.round(point.x / epsilon) * epsilon;
+                        point.y = Math.round(point.y / epsilon) * epsilon;
+
                         otherPoly.invalidate();
                     }
                 }
@@ -122,59 +204,27 @@ public class ShapeNavigationMapBuilder implements IMeshNavigatoinMapBuilder {
         }
     }
 
-    public function get epsilon():Number { return _epsilon; }
+    private function mapPointsToPolygons(polys:List):Map {
+        var points:Map = new HashMap();
 
-    public function get locations():Collection { return null; }
+        var count:int = polys.size();
+        for(var i:int = 0; i < count; ++i) {
+            var poly:Polygon2D = polys.get(i);
 
-    public function populateConnected(location:Point2D, map:MeshNavigationMap, resultNodes:Collection, resultPolygons:Collection):void {
-    }
+            var polyPointCount:int = poly.pointCount;
+            for(var j:int = 0; j < polyPointCount; ++j) {
+                var point:Point2D = poly.getPoint2D(j);
 
-    private function populatePolysAndPoints(shapes:Collection, polys:List, points:List):void {
-        var it:Iterator = shapes.iterator();
-        while(it.hasNext()) {
-            var shape2D:Shape2D = it.next();
-            var poly:Polygon2D = new Polygon2D();
+                var mappedPolys:List = points.get(point);
 
-            var coords:Vector.<Point2D> = new <Point2D>[new Point2D(), new Point2D(), new Point2D()];
+                if(mappedPolys == null)
+                    points.put(point, mappedPolys = new ArrayList());
 
-            for(var pathIt:PathIterator = shape2D.getPathIterator(null, 1); !pathIt.isDone(); pathIt.next()) {
-                var segType:SegmentType = pathIt.currentSegment(coords);
-
-                if(segType == SegmentType.QuadTo || segType == SegmentType.CubicTo)
-                    throw new ArgumentError("quad and cubic segments not supported");
-
-                if(segType == SegmentType.LineTo || segType == SegmentType.MoveTo) {
-                    poly.addPoint2D(coords[0]);
-                    points.add(poly.getPoint2D(poly.pointCount - 1)); // this one is not cloned
-                }
-            }
-
-            if(poly.pointCount < 3)
-                throw new ArgumentError("line or point shapes are not allowed");
-
-            polys.add(poly);
-        }
-    }
-
-    private function calculateMinimumDistance(points:List):Number {
-        var smallestDistance:Number = Number.MAX_VALUE;
-
-        var pointCount:int = points.size();
-        for(var i:int = 0; i < pointCount; ++i) {
-            var point:Point2D = points.get(i);
-
-            for(var j:int = 0; j < pointCount; ++j) {
-                if(j == i) continue;
-
-                var otherPoint:Point2D = points.get(j);
-                var distance:Number = point.distanceSq(otherPoint);
-
-                if(smallestDistance > distance)
-                    smallestDistance = distance;
+                mappedPolys.add(poly);
             }
         }
 
-        return Math.sqrt(smallestDistance) * 0.05;
+        return points;
     }
 }
 }
