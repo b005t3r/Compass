@@ -4,17 +4,16 @@
  * Time: 9:18
  */
 package compass.builder {
-import compass.navigation.grid.GridFinishNavigationNode;
+import compass.navigation.IFinishNavigationNode;
+import compass.navigation.IStartNavigationNode;
 import compass.navigation.grid.GridNavigationAgent;
 import compass.navigation.grid.GridNavigationMap;
 import compass.navigation.grid.GridNavigationNode;
-import compass.navigation.grid.GridStartNavigationNode;
 
 import medkit.collection.iterator.Iterator;
 import medkit.util.StopWatch;
 
 import org.flexunit.asserts.assertEquals;
-
 import org.flexunit.asserts.assertTrue;
 
 public class PathBuilderGridTest {
@@ -77,11 +76,11 @@ public class PathBuilderGridTest {
     public function testFindPath():void {
         var agent:GridNavigationAgent = new GridNavigationAgent();
 
-        var start:GridStartNavigationNode;
-        var finish:GridFinishNavigationNode;
+        var start:IStartNavigationNode;
+        var finish:IFinishNavigationNode;
 
-        start   = new GridStartNavigationNode(map.getNodeAt(1, 1), map);
-        finish  = new GridFinishNavigationNode(map.getNodeAt(46, 38), map);
+        start   = map.createStartNode(1, 1);
+        finish  = map.createFinishNode(46, 38);
 
         var pathBuilder:PathBuilder = new PathBuilder();
 
@@ -93,7 +92,7 @@ public class PathBuilderGridTest {
         assertEquals(start.uniqueID, GridNavigationNode(path.navigationNodes.get(0)).uniqueID);
         assertEquals(finish.uniqueID, GridNavigationNode(path.navigationNodes.get(path.navigationNodes.size() - 1)).uniqueID);
 
-        var node:GridNavigationNode = start, count:int = path.navigationNodes.size();
+        var node:GridNavigationNode = start as GridNavigationNode, count:int = path.navigationNodes.size();
         for(var i:int = 1; i < count; ++i) {
             var next:GridNavigationNode = path.navigationNodes.get(i);
 
@@ -111,8 +110,8 @@ public class PathBuilderGridTest {
             node = next;
         }
 
-        start   = new GridStartNavigationNode(map.getNodeAt(17, 35), map);
-        finish  = new GridFinishNavigationNode(map.getNodeAt(25, 34), map);
+        start   = map.createStartNode(17, 35);
+        finish  = map.createFinishNode(25, 34);
 
         StopWatch.startWatch("findPath");
         pathBuilder.findPath(start, finish, agent, path);
@@ -120,8 +119,8 @@ public class PathBuilderGridTest {
 
         assertTrue(! path.complete);
 
-        start   = new GridStartNavigationNode(map.getNodeAt(26, 14), map);
-        finish  = new GridFinishNavigationNode(map.getNodeAt(46, 9), map);
+        start   = map.createStartNode(26, 14);
+        finish  = map.createFinishNode(46, 9);
 
         StopWatch.startWatch("findPath");
         pathBuilder.findPath(start, finish, agent, path);

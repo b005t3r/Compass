@@ -8,11 +8,13 @@ import compass.navigation.IFinishNavigationNode;
 import compass.navigation.INavigationAgent;
 import compass.navigation.INavigationMap;
 import compass.navigation.INavigationNode;
+import compass.navigation.IStartNavigationNode;
 
 import medkit.collection.ArrayList;
-
 import medkit.collection.Collection;
+import medkit.collection.HashSet;
 import medkit.collection.List;
+import medkit.collection.Set;
 import medkit.collection.iterator.Iterator;
 import medkit.geom.shapes.Point2D;
 import medkit.geom.shapes.Polygon2D;
@@ -22,10 +24,11 @@ public class MeshNavigationMap implements INavigationMap {
         return startNode.location.distance(destinationNode.location) * commonCost;
     }
 
-    protected var _nodes:List = new ArrayList();
     protected var _epsilon:Number;
 
-    protected var _costFunction:Function = euclidianTravelCost;
+    protected var _nodes:List               = new ArrayList(); // TODO: change to spatial set
+    protected var _polys:List               = new ArrayList(); // TODO: change to spatial set
+    protected var _costFunction:Function    = euclidianTravelCost;
 
     public function MeshNavigationMap(builder:IMeshNavigatoinMapBuilder) {
         _epsilon = builder.epsilon;
@@ -38,30 +41,48 @@ public class MeshNavigationMap implements INavigationMap {
             _nodes.add(newNode);
         }
 
+        var polySet:Set = new HashSet();
+
         var count:int = _nodes.size();
         for(var j:int = 0; j < count; ++j) {
             var node:MeshNavigationNode = _nodes.get(j);
 
             builder.populateConnected(node.location, this, node.connectedNodes, node.connectedPolygons);
+            polySet.addAll(node.connectedPolygons);
         }
+
+        _polys.addAll(polySet);
     }
 
     public function get nodes():Collection { return _nodes; }
 
     // TODO: spatial optimization for MeshNavigationNodes
     public function isConnectedToFinishNode(node:INavigationNode, finishNode:IFinishNavigationNode, agent:INavigationAgent):Boolean {
-        var meshNode:MeshNavigationNode = node as MeshNavigationNode;
-        var meshFinishNode:MeshNavigationNode = finishNode as MeshNavigationNode;
+        var meshNode:MeshNavigationNode         = node as MeshNavigationNode;
+        var meshFinishNode:MeshNavigationNode   = finishNode as MeshNavigationNode;
 
-        var it:Iterator = meshNode.connectedPolygons.iterator();
-        while(it.hasNext()) {
-            var poly:Polygon2D = it.next();
+        if(meshNode is PolygonStartNavigationNode) {
+            var polyIt:Iterator = meshFinishNode.connectedPolygons.iterator();
+            while(polyIt.hasNext()) {
+                var poly:Polygon2D = polyIt.next();
 
-            if(poly.containsPoint2D(meshFinishNode.location))
-                return true;
+                if(poly.containsPoint2D(meshNode.location))
+                    return true;
+            }
+
+            return false;
         }
+        else {
+            var connectedIt:Iterator = meshFinishNode.connectedNodes.iterator();
+            while(connectedIt.hasNext()) {
+                var connectedNode:MeshNavigationNode = connectedIt.next();
 
-        return false;
+                if(meshNode.uniqueID == connectedNode.uniqueID)
+                    return true;
+            }
+
+            return false;
+        }
     }
 
     public function estimatedCostToFinish(node:INavigationNode, finishNode:IFinishNavigationNode, agent:INavigationAgent):Number {
@@ -87,5 +108,117 @@ public class MeshNavigationMap implements INavigationMap {
 
         return null;
     }
+
+    public function createStartNode(x:Number, y:Number):IStartNavigationNode {
+        var node:MeshNavigationNode = getNodeAt(x, y);
+
+        if(node != null)
+            return new LocationStartNavigationNode(node, this);
+
+        var count:int = _polys.size();
+        for(var i:int = 0; i < count; ++i) {
+            var poly:Polygon2D = _polys.get(i);
+
+            if(poly.contains(x, y)) {
+                var connectedNodes:List = connectedNodesForPolygon(poly);
+
+                return new PolygonStartNavigationNode(x, y, this, poly, connectedNodes);
+            }
+        }
+
+        return null;
+    }
+
+    public function createFinishNode(x:Number, y:Number):IFinishNavigationNode {
+        var node:MeshNavigationNode = getNodeAt(x, y);
+
+        if(node != null)
+            return new LocationFinishNavigationNode(node, this);
+
+        var count:int = _polys.size();
+        for(var i:int = 0; i < count; ++i) {
+            var poly:Polygon2D = _polys.get(i);
+
+            if(poly.contains(x, y)) {
+                var connectedNodes:List = connectedNodesForPolygon(poly);
+
+                return new PolygonFinishNavigationNode(x, y, this, poly, connectedNodes);
+            }
+        }
+
+        return null;
+    }
+
+    private function connectedNodesForPolygon(poly:Polygon2D):List {
+        var connectedNodes:List = new ArrayList(poly.pointCount);
+
+        var pointCount:int = poly.pointCount;
+        for(var j:int = 0; j < pointCount; ++j) {
+            var point:Point2D = poly.getPoint2D(j);
+            var connectedNode:MeshNavigationNode = getNodeAt(point.x, point.y);
+
+            if(connectedNode == null)
+                throw new Error("missing node for one of the polygon's points: " + point);
+
+            connectedNodes.add(connectedNode);
+        }
+
+        return connectedNodes;
+    }
 }
+}
+
+import compass.navigation.IFinishNavigationNode;
+import compass.navigation.IStartNavigationNode;
+import compass.navigation.mesh.MeshNavigationMap;
+import compass.navigation.mesh.MeshNavigationNode;
+
+import medkit.collection.Collection;
+
+import medkit.geom.shapes.Polygon2D;
+
+class PolygonStartNavigationNode extends MeshNavigationNode implements IStartNavigationNode {
+    public function PolygonStartNavigationNode(x:Number, y:Number, map:MeshNavigationMap, polygon:Polygon2D, connectedNodes:Collection) {
+        super(x, y, map, -1);
+
+        _polygons.add(polygon);
+        _nodes.addAll(connectedNodes);
+    }
+}
+
+class LocationStartNavigationNode extends MeshNavigationNode implements IStartNavigationNode {
+    private var _meshNode:MeshNavigationNode;
+
+    public function LocationStartNavigationNode(node:MeshNavigationNode, map:MeshNavigationMap) {
+        _meshNode = node;
+
+        super(_meshNode.location.x, _meshNode.location.y, map, _meshNode.uniqueID);
+    }
+
+    override public function get connectedNodes():Collection { return _meshNode.connectedNodes; }
+
+    override public function get connectedPolygons():Collection { return _meshNode.connectedPolygons; }
+}
+
+class PolygonFinishNavigationNode extends MeshNavigationNode implements IFinishNavigationNode {
+    public function PolygonFinishNavigationNode(x:Number, y:Number, map:MeshNavigationMap, polygon:Polygon2D, connectedNodes:Collection) {
+        super(x, y, map, -2);
+
+        _polygons.add(polygon);
+        _nodes.addAll(connectedNodes);
+    }
+}
+
+class LocationFinishNavigationNode extends MeshNavigationNode implements IFinishNavigationNode {
+    private var _meshNode:MeshNavigationNode;
+
+    public function LocationFinishNavigationNode(node:MeshNavigationNode, map:MeshNavigationMap) {
+        _meshNode = node;
+
+        super(_meshNode.location.x, _meshNode.location.y, map, _meshNode.uniqueID);
+    }
+
+    override public function get connectedNodes():Collection { return _meshNode.connectedNodes; }
+
+    override public function get connectedPolygons():Collection { return _meshNode.connectedPolygons; }
 }
