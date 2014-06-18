@@ -33,7 +33,7 @@ public class PathBuilderNode implements Equalable, Comparable, Hashable {
         return this;
     }
 
-    /** Both builder nodes are equal if their navigation nodes are equal. */
+    /** Both builder nodes are equal if their navigation nodes' uniqueIDs are equal. */
     public function equals(object:Equalable):Boolean {
         var builderNode:PathBuilderNode = object as PathBuilderNode;
 
