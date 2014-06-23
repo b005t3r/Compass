@@ -3,7 +3,7 @@
  * Date: 12/06/14
  * Time: 14:58
  */
-package compass.builder {
+package compass.path {
 import compass.navigation.IFinishNavigationNode;
 import compass.navigation.IStartNavigationNode;
 import compass.navigation.mesh.MeshNavigationAgent;
@@ -142,7 +142,7 @@ public class PathBuilderMeshTest {
         finish = map.createFinishNode(14.5, 8);
 
         StopWatch.startWatch("findPath");
-        path = pathBuilder.findPath(start, finish, agent);
+        path = pathBuilder.findPath(start, finish, agent, path);
         trace(getFunctionName(arguments.callee, this) + ": ", StopWatch.stopWatch("findPath"));
 
         checkPathCoherency(start, finish, path);

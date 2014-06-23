@@ -3,7 +3,7 @@
  * Date: 08/05/14
  * Time: 14:49
  */
-package compass.builder {
+package compass.path {
 import compass.navigation.IFinishNavigationNode;
 import compass.navigation.INavigationAgent;
 import compass.navigation.INavigationMap;
@@ -18,6 +18,7 @@ import medkit.collection.iterator.Iterator;
 
 public class PathBuilder {
     private var _alpha:Number = 0.5;
+    private var _minDiff:Number = 1;
 
     /**
      * How much actual and estimated cost is taken into account when pathfinding.
@@ -26,6 +27,10 @@ public class PathBuilder {
      */
     public function get alpha():Number { return _alpha; }
     public function set alpha(value:Number):void { _alpha = value; }
+
+    /** Estimated distances to finish will be treated as indifferent if they differ by less than this value. @default 1.0 */
+    public function get minimumDifference():Number { return _minDiff; }
+    public function set minimumDifference(value:Number):void { _minDiff = value; }
 
     public function findPath(startNode:IStartNavigationNode, finishNode:IFinishNavigationNode, agent:INavigationAgent, path:Path = null, maxIterations:int = int.MAX_VALUE):Path {
         if(path != null)    path.reset();
@@ -64,7 +69,7 @@ public class PathBuilder {
         // let's assume we can find the path on one go
         path.complete = true;
 
-        var currentNode:PathBuilderNode = path.fetchBuilderNode().reset(startNode);
+        var currentNode:PathBuilderNode = path.fetchBuilderNode().reset(startNode, this);
 
         openNodes.add(currentNode);
 
@@ -80,13 +85,15 @@ public class PathBuilder {
 
             var it:Iterator = connectedNodes.iterator();
             while(it.hasNext()) {
-                var testNode:PathBuilderNode = path.fetchBuilderNode().reset(it.next());
+                var testNode:PathBuilderNode = path.fetchBuilderNode().reset(it.next(), this);
 
                 var travelCost:Number = testNode.navigationNode.getTravelCost(currentNode.navigationNode, agent);
 
                 // travelCost != travelCost - fast isNaN test
-                if(travelCost != travelCost || testNode.equals(currentNode) || closedNodes.contains(testNode))
+                if(travelCost != travelCost || testNode.equals(currentNode) || closedNodes.contains(testNode)) {
+                    path.releaseLastFetched();
                     continue;
+                }
 
                 var actualCostFromStart:Number  = currentNode.costFromStart + travelCost;
                 var estimatedCostToEnd:Number   = map.estimatedCostToFinish(testNode.navigationNode, finishNode, agent);
@@ -96,8 +103,10 @@ public class PathBuilder {
                 testNode.estimatedTotalCost     = estimatedTotalCost;
                 testNode.parentNode             = currentNode;
 
-                if(openNodes.contains(testNode))
+                if(openNodes.contains(testNode)) {
+                    path.releaseLastFetched();
                     continue;
+                }
 
                 openNodes.add(testNode);
             }

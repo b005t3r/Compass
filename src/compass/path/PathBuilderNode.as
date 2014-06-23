@@ -3,7 +3,7 @@
  * Date: 08/05/14
  * Time: 14:59
  */
-package compass.builder {
+package compass.path {
 import compass.navigation.INavigationNode;
 
 import medkit.object.Comparable;
@@ -24,11 +24,17 @@ public class PathBuilderNode implements Equalable, Comparable, Hashable {
     /** Parent node used to travel from to this node. */
     public var parentNode:PathBuilderNode = null;
 
-    public function reset(node:INavigationNode):PathBuilderNode {
+    /** Builder currently using this node. */
+    private var builder:PathBuilder = null;
+    private var minDiff:Number = NaN;
+
+    public function reset(node:INavigationNode, builder:PathBuilder):PathBuilderNode {
         this.costFromStart      = 0;
         this.estimatedTotalCost = 0;
         this.navigationNode     = node;
         this.parentNode         = null;
+        this.builder            = builder;
+        this.minDiff            = builder.minimumDifference;
 
         return this;
     }
@@ -48,18 +54,18 @@ public class PathBuilderNode implements Equalable, Comparable, Hashable {
 
         if(builderNode == null) throw new ArgumentError("PathBuilderNode can only be compared with another PathBuilderNode: " + object);
 
+        var idDiff:int = navigationNode.uniqueID - builderNode.navigationNode.uniqueID;
+
+        if(idDiff == 0)
+            return 0;
+
         var result:Number = estimatedTotalCost - builderNode.estimatedTotalCost;
 
-        if(result > 0.0)        return 1;
-        else if(result < 0.0)   return -1;
+        if(Math.abs(result) < minDiff)
+            return idDiff; // cost is the same, but described cells can still be different
 
-        // from now on we just try not to remove nodes with the same cost, but describing different cells
-        result = navigationNode.uniqueID - builderNode.navigationNode.uniqueID;
-
-        if(result > 0.0)        return 1;
-        else if(result < 0.0)   return -1;
-
-        return 0;
+        if(result > 0.0)    return 1;
+        else                return -1;
     }
 
     public function hashCode():int {

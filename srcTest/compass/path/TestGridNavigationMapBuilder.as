@@ -3,7 +3,7 @@
  * Date: 12/05/14
  * Time: 12:18
  */
-package compass.builder {
+package compass.path {
 import compass.navigation.grid.GridNavigationMap;
 import compass.navigation.grid.IGridNavigationMapBuilder;
 

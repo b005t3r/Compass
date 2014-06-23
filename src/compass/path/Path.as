@@ -3,7 +3,7 @@
  * Date: 09/05/14
  * Time: 11:06
  */
-package compass.builder {
+package compass.path {
 import medkit.collection.ArrayList;
 import medkit.collection.HashSet;
 import medkit.collection.List;
@@ -39,6 +39,10 @@ public class Path {
             ensureCacheSize(Math.ceil(_cachedBuilderNodes.size() * 1.5) + 10);
 
         return _cachedBuilderNodesIt.next();
+    }
+
+    public function releaseLastFetched():void {
+        _cachedBuilderNodesIt.previous();
     }
 
     public function reset():void {

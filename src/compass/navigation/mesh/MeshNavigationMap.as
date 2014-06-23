@@ -55,6 +55,7 @@ public class MeshNavigationMap implements INavigationMap {
     }
 
     public function get nodes():Collection { return _nodes; }
+    public function get polygons():Collection { return _polys; }
 
     // TODO: spatial optimization for MeshNavigationNodes
     public function isConnectedToFinishNode(node:INavigationNode, finishNode:IFinishNavigationNode, agent:INavigationAgent):Boolean {
@@ -72,17 +73,8 @@ public class MeshNavigationMap implements INavigationMap {
 
             return false;
         }
-        else {
-            var connectedIt:Iterator = meshFinishNode.connectedNodes.iterator();
-            while(connectedIt.hasNext()) {
-                var connectedNode:MeshNavigationNode = connectedIt.next();
 
-                if(meshNode.uniqueID == connectedNode.uniqueID)
-                    return true;
-            }
-
-            return false;
-        }
+        return meshFinishNode.connectedNodes.contains(meshNode);
     }
 
     public function estimatedCostToFinish(node:INavigationNode, finishNode:IFinishNavigationNode, agent:INavigationAgent):Number {
