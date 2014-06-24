@@ -18,7 +18,6 @@ import medkit.collection.iterator.Iterator;
 
 public class PathBuilder {
     private var _alpha:Number = 0.5;
-    private var _minDiff:Number = 1;
 
     /**
      * How much actual and estimated cost is taken into account when pathfinding.
@@ -27,10 +26,6 @@ public class PathBuilder {
      */
     public function get alpha():Number { return _alpha; }
     public function set alpha(value:Number):void { _alpha = value; }
-
-    /** Estimated distances to finish will be treated as indifferent if they differ by less than this value. @default 1.0 */
-    public function get minimumDifference():Number { return _minDiff; }
-    public function set minimumDifference(value:Number):void { _minDiff = value; }
 
     public function findPath(startNode:IStartNavigationNode, finishNode:IFinishNavigationNode, agent:INavigationAgent, path:Path = null, maxIterations:int = int.MAX_VALUE):Path {
         if(path != null)    path.reset();
@@ -60,37 +55,41 @@ public class PathBuilder {
 
         var connectedNodes:Collection;
         var oneMinusAlpha:Number    = 1.0 - _alpha;
-        var openNodes:TreeSet       = path.openBuilderNodes;
+        var sortedOpenNodes:TreeSet = path.sortedOpenBuilderNodes;
+        var uniqueOpenNodes:HashSet = path.uniqueOpenBuilderNodes;
         var closedNodes:HashSet     = path.closedBuilderNodes;
 
-        openNodes.clear(); // reset open nodes - continuing the search is the same as starting a new search really
+        sortedOpenNodes.clear(); // reset open nodes - continuing the search is the same as starting a new search really
+        uniqueOpenNodes.clear();
         //closedNodes.clear(); // don't reset closed nodes, so we won't be going back and forth each call
 
         // let's assume we can find the path on one go
         path.complete = true;
 
-        var currentNode:PathBuilderNode = path.fetchBuilderNode().reset(startNode, this);
+        var currentNode:PathBuilderNode = path.fetchBuilderNode().reset(startNode);
 
-        openNodes.add(currentNode);
+        sortedOpenNodes.add(currentNode);
+        uniqueOpenNodes.add(currentNode);
 
         while(! map.isConnectedToFinishNode(currentNode.navigationNode, finishNode, agent)) {
-            if(openNodes.size() == 0 || maxIterations == 0) {
+            if(sortedOpenNodes.size() == 0 || maxIterations == 0) {
                 path.complete = false; // path still incomplete
                 break;
             }
 
-            currentNode = openNodes.pollFirst();
+            currentNode = sortedOpenNodes.pollFirst();
+            uniqueOpenNodes.remove(currentNode);
 
             connectedNodes = currentNode.navigationNode.connectedNodes;
 
             var it:Iterator = connectedNodes.iterator();
             while(it.hasNext()) {
-                var testNode:PathBuilderNode = path.fetchBuilderNode().reset(it.next(), this);
+                var testNode:PathBuilderNode = path.fetchBuilderNode().reset(it.next());
 
                 var travelCost:Number = testNode.navigationNode.getTravelCost(currentNode.navigationNode, agent);
 
                 // travelCost != travelCost - fast isNaN test
-                if(travelCost != travelCost || testNode.equals(currentNode) || closedNodes.contains(testNode)) {
+                if(travelCost != travelCost || testNode.equals(currentNode) || closedNodes.contains(testNode) || uniqueOpenNodes.contains(testNode)) {
                     path.releaseLastFetched();
                     continue;
                 }
@@ -103,17 +102,23 @@ public class PathBuilder {
                 testNode.estimatedTotalCost     = estimatedTotalCost;
                 testNode.parentNode             = currentNode;
 
-                if(openNodes.contains(testNode)) {
+/*
+                if(uniqueOpenNodes.contains(testNode)) {
                     path.releaseLastFetched();
                     continue;
                 }
+*/
 
-                openNodes.add(testNode);
+                sortedOpenNodes.add(testNode);
+                uniqueOpenNodes.add(testNode);
             }
 
             closedNodes.add(currentNode);
             --maxIterations;
         }
+
+        //trace("open: ", sortedOpenNodes);
+        //trace("closed: ", closedNodes);
 
         var pathContinuation:ArrayList = new ArrayList();
         while(currentNode != null) {
@@ -136,7 +141,7 @@ public class PathBuilder {
             path.navigationNodes.add(finishNode);
 
         // if there still is a chance and need to complete this path, return true; false otherwise
-        return ! path.complete && openNodes.size() > 0;
+        return ! path.complete && sortedOpenNodes.size() > 0;
     }
 }
 }

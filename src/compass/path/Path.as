@@ -14,7 +14,8 @@ public class Path {
     private var _complete:Boolean               = false;
     private var _navigationNodes:List           = new ArrayList();
 
-    private var _openBuilderNodes:TreeSet       = new TreeSet();
+    private var _sortedOpenBuilderNodes:TreeSet = new TreeSet();
+    private var _uniqueOpenBuilderNodes:HashSet = new HashSet();
     private var _closedBuilderNodes:HashSet     = new HashSet();
 
     private var _cachedBuilderNodes:List        = new ArrayList();
@@ -31,7 +32,8 @@ public class Path {
 
     public function get navigationNodes():List { return _navigationNodes; }
 
-    public function get openBuilderNodes():TreeSet { return _openBuilderNodes; }
+    public function get sortedOpenBuilderNodes():TreeSet { return _sortedOpenBuilderNodes; }
+    public function get uniqueOpenBuilderNodes():HashSet { return _uniqueOpenBuilderNodes; }
     public function get closedBuilderNodes():HashSet { return _closedBuilderNodes; }
 
     public function fetchBuilderNode():PathBuilderNode {
@@ -49,7 +51,8 @@ public class Path {
         _complete = false;
         _navigationNodes.clear();
 
-        _openBuilderNodes.clear();
+        _sortedOpenBuilderNodes.clear();
+        _uniqueOpenBuilderNodes.clear();
         _closedBuilderNodes.clear();
 
         _cachedBuilderNodesIt = _cachedBuilderNodes.listIterator();

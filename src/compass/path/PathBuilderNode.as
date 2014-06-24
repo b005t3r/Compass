@@ -28,13 +28,11 @@ public class PathBuilderNode implements Equalable, Comparable, Hashable {
     private var builder:PathBuilder = null;
     private var minDiff:Number = NaN;
 
-    public function reset(node:INavigationNode, builder:PathBuilder):PathBuilderNode {
+    public function reset(node:INavigationNode):PathBuilderNode {
         this.costFromStart      = 0;
         this.estimatedTotalCost = 0;
         this.navigationNode     = node;
         this.parentNode         = null;
-        this.builder            = builder;
-        this.minDiff            = builder.minimumDifference;
 
         return this;
     }
@@ -54,22 +52,21 @@ public class PathBuilderNode implements Equalable, Comparable, Hashable {
 
         if(builderNode == null) throw new ArgumentError("PathBuilderNode can only be compared with another PathBuilderNode: " + object);
 
-        var idDiff:int = navigationNode.uniqueID - builderNode.navigationNode.uniqueID;
-
-        if(idDiff == 0)
-            return 0;
-
         var result:Number = estimatedTotalCost - builderNode.estimatedTotalCost;
 
-        if(Math.abs(result) < minDiff)
-            return idDiff; // cost is the same, but described cells can still be different
+        if(result < 0)      return -1;
+        else if(result > 0) return 1;
 
-        if(result > 0.0)    return 1;
-        else                return -1;
+        // try to differentiate nodes with the same cost
+        return navigationNode.uniqueID - builderNode.navigationNode.uniqueID;
     }
 
     public function hashCode():int {
         return navigationNode.uniqueID;
+    }
+
+    public function toString():String {
+        return "PathBuilderNode{costFromStart=" + String(costFromStart) + ", estimatedTotalCost=" + String(estimatedTotalCost) + ", navigationNode.uniqueID=" + String(navigationNode.uniqueID) + "}";
     }
 }
 }
